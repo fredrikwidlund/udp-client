@@ -38,7 +38,7 @@ struct input
 {  
   size_t        index;
   list          sockets;
-  rtp_receiver  rtp;
+  rtp_receiver  receiver;
 };
 
 static void usage()
@@ -51,9 +51,9 @@ static void usage()
 
 /*
 static uint64_t ntime(void)
-{
+{r
   struct timespec ts;
-
+  
   (void) clock_gettime(CLOCK_REALTIME, &ts);
   return ((uint64_t) ts.tv_sec * 1000000000) + ((uint64_t) ts.tv_nsec);
 }
@@ -93,18 +93,26 @@ static void input_socket_event(void *state, int type, void *data)
 {
   input_socket *socket = state;
   uint8_t block[16384];
-  ssize_t n;
+  ssize_t size, n;
+  rtp *rtp;
 
   (void) data;
   switch (type)
     {
     case REACTOR_CORE_FD_EVENT_READ:
-      n = read(socket->fd, block, sizeof block);
-      if (n == -1)
+      size = read(socket->fd, block, sizeof block);
+      if (size == -1)
 	break;
-      //if (n == 1328)
-      //debug(input, block + 12, n - 12);
-      (void) fprintf(stderr, "read %ld\n", n);
+      n = rtp_receiver_write(&socket->input->receiver, block, size, socket->type);
+      if (n == -1)
+        errx(1, "rtp_receiver_write");
+      while (1)
+        {
+          rtp = rtp_receiver_read(&socket->input->receiver);
+          if (!rtp)
+            break;
+          printf("read %u\n", rtp->sequence_number);
+        }
       break;
     default:
       errx(1, "invalid event");
@@ -125,13 +133,14 @@ input_socket *input_socket_new(json_t *conf, input *input)
   if (!node || !service || !type_string)
     return NULL;
   if (strcmp(type_string, "data") == 0)
-    type = 0;
+    type = RTP_TYPE_DATA;
   else if (strcmp(type_string, "fec") == 0)
-    type = 1;
+    type = RTP_TYPE_FEC;
   else
     return NULL;
 
-  e = getaddrinfo(node, service, (struct addrinfo[]){{.ai_family = AF_INET, .ai_socktype = SOCK_DGRAM, .ai_flags = AI_NUMERICHOST | AI_NUMERICSERV}}, &addrinfo);
+  e = getaddrinfo(node, service, (struct addrinfo[]){{.ai_family = AF_INET, .ai_socktype = SOCK_DGRAM,
+          .ai_flags = AI_NUMERICHOST | AI_NUMERICSERV}}, &addrinfo);
   if (e == -1)
     return NULL;
 
@@ -223,7 +232,7 @@ input *input_new(size_t index, json_t *conf)
     abort();
   *input = (struct input) {.index = index};
   list_construct(&input->sockets);
-  rtp_receiver_construct(&input->rtp);
+  rtp_receiver_construct(&input->receiver);
 
   e = input_open(input, conf);
   if (e == -1)
