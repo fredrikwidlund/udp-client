@@ -35,7 +35,7 @@ struct input_socket
 };
 
 struct input
-{  
+{
   size_t        index;
   list          sockets;
   rtp_receiver  receiver;
@@ -53,7 +53,7 @@ static void usage()
 static uint64_t ntime(void)
 {r
   struct timespec ts;
-  
+
   (void) clock_gettime(CLOCK_REALTIME, &ts);
   return ((uint64_t) ts.tv_sec * 1000000000) + ((uint64_t) ts.tv_nsec);
 }
@@ -93,25 +93,27 @@ static void input_socket_event(void *state, int type, void *data)
 {
   input_socket *socket = state;
   uint8_t block[16384];
-  ssize_t size, n;
-  rtp *rtp;
+  ssize_t n;
+  void *payload;
+  size_t payload_size;
 
   (void) data;
   switch (type)
     {
     case REACTOR_CORE_FD_EVENT_READ:
-      size = read(socket->fd, block, sizeof block);
-      if (size == -1)
-	break;
-      n = rtp_receiver_write(&socket->input->receiver, block, size, socket->type);
+      n = read(socket->fd, block, sizeof block);
+      if (n == -1)
+        break;
+      n = rtp_receiver_write(&socket->input->receiver, block, n, socket->type);
       if (n == -1)
         errx(1, "rtp_receiver_write");
       while (1)
         {
-          rtp = rtp_receiver_read(&socket->input->receiver);
-          if (!rtp)
+          n = rtp_receiver_read(&socket->input->receiver, &payload, &payload_size);
+          if (n == -1)
+            errx(1, "rtp_receiver_read");
+          if (!n)
             break;
-          printf("read %u\n", rtp->sequence_number);
         }
       break;
     default:
