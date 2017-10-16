@@ -190,20 +190,28 @@ static int rtp_receiver_enqueue_data(rtp_receiver *r, rtp *f)
   int16_t d;
 
   if (f->p || f->x || f->m || f->cc)
-    return -1;
+    {
+      fprintf(stderr, "invalid frame\n");
+      return -1;
+    }
   
   if (r->data_count >= RTP_MAX_DATA_COUNT)
-    return -1;
-  
+    {
+      fprintf(stderr, "count %lu\n", r->data_count);
+      return -1;
+    }
   list_foreach_reverse(&r->data, i)
     {
       d = rtp_distance(*i, f);
-      if (d > RTP_MAX_DISTANCE || d < -RTP_MAX_DISTANCE)  
-        return -1;
+      if (d > RTP_MAX_DISTANCE || d < -RTP_MAX_DISTANCE)
+        {
+          fprintf(stderr, "d %d\n", d);
+          return -1;
+        }
       if (d > 0)
         break;
       if (!d)
-          return 0;
+        return 0;
     }
 
   list_insert(list_next(i), &f, sizeof f);
@@ -221,6 +229,7 @@ ssize_t rtp_receiver_write(rtp_receiver *r, void *data, size_t size, int type)
   f = rtp_new(data, size);
   if (!f)
     return -1;
+
   switch (type)
     {
     case RTP_TYPE_DATA:

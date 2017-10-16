@@ -7,13 +7,19 @@ bin_PROGRAMS = bin/udp_client
 
 UDP_CLIENT_SOURCE_FILES = \
 src/udp_client/rtp.c \
+src/udp_client/segmenter.c \
+src/udp_client/input.c \
+src/udp_client/output.c \
 src/udp_client/main.c
 
 UDP_CLIENT_HEADER_FILES = \
-src/udp_client/rtp.h
+src/udp_client/rtp.h \
+src/udp_client/segmenter.h \
+src/udp_client/input.h \
+src/udp_client/output.h
 
 bin_udp_client_SOURCES = $(UDP_CLIENT_SOURCE_FILES) $(UDP_CLIENT_HEADER_FILES)
-bin_udp_client_LDADD = -ljansson -ldynamic -lreactor -lts
+bin_udp_client_LDADD = -ljansson -lreactor -lts -ldynamic
 
 MAINTAINERCLEANFILES = aclocal.m4 config.h.in configure Makefile.in docs/Makefile.in
 maintainer-clean-local:; rm -rf autotools m4
