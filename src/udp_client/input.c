@@ -113,9 +113,6 @@ void input_socket_event(void *state, int type, void *data)
           n = segmenter_write(&socket->stream->segmenter, base, size);
           if (n == -1)
             errx(1, "segmenter_write");
-
-          if (n == 1)
-            input_update(socket->stream->input);
         }
       break;
     default:
@@ -243,6 +240,7 @@ void input_align(input *input)
     }  
 }
 
+// XXX buffering does not work properly
 double input_time(input *input)
 {
   input_stream **i;
@@ -259,18 +257,50 @@ double input_time(input *input)
       if (segmenter_time(s) < min)
         min = segmenter_time(s);
     }
+
   input->state = INPUT_STATE_RUNNING;
   return min;
-}
-
-void input_update(input *input)
-{
-  input_align(input);
 }
 
 int input_state(input *input)
 {
   return input->state;
+}
+
+input_segments *input_get(input *input)
+{
+  double t;
+  input_segments *s;
+  input_segment *segment;
+  input_stream **i;
+  segmenter *segmenter;
+  size_t n;
+
+  t = input_time(input);
+  if (!t)
+    return NULL;
+
+  s = malloc(sizeof *s);
+  if (!s)
+    abort();
+  s->time = t;
+  list_construct(&s->streams);
+
+  list_foreach(&input->streams, i)
+    {
+      segment = malloc(sizeof *segment);
+      if (!segment)
+        abort();
+      segment->id = (*i)->id;
+      ts_packets_construct(&segment->packets);
+      segmenter = &(*i)->segmenter;
+      n = segmenter_pop(segmenter, &segment->packets);
+      if (!n)
+        err(1, "segmenter_pop");
+      list_push_back(&s->streams, &segment, sizeof segment);
+    }
+  
+  return s;
 }
 
 int inputs_construct(inputs *inputs, json_t *conf)
@@ -304,13 +334,24 @@ void inputs_destruct(inputs *inputs)
   fprintf(stderr, "[inputs destruct %p]\n", (void *) inputs);
 }
 
+input_segments *inputs_get(inputs *inputs)
+{
+  input **i;
+  input_segments *s;
+  
+  list_foreach(&inputs->list, i)
+    {
+      s = input_get(*i);
+      if (s)
+        return s;
+    }
+
+  return NULL;
+}
+
 /*
 void inputs_process(inputs *inputs)
 {
-  input **i;
-
-  list_foreach(&inputs->list, i)
-    input_process(*i);
 }
 
 void input_process(input *input)

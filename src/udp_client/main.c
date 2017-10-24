@@ -45,26 +45,13 @@ static uint64_t ntime(void)
 
 static void mixer_process(mixer *mixer)
 {
-  double t, time;
-  input *input, **i;
-  list *streams;
-  ssize_t n;
+  double t;
+  input_segments *segments;
 
-  t = (double) ntime() / 1000000000;
-  streams = NULL;
-  list_foreach(&mixer->inputs.list, i)
-    {
-      n = input_pop(*i, &streams);
-      if (n == 1)
-        break;
-    }
-
-  if (!streams)
-    {
-      fprintf(stderr, "no streams %.03f\n", t);
-      return;
-    }
+  segments = inputs_get(&mixer->inputs);
   
+  t = (double) ntime() / 1000000000;
+  (void) fprintf(stderr, "segments %p, time %.03f\n", (void *) segments, t);
 }
 
 static void mixer_event(void *state, int type, void *data)
